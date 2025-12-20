@@ -123,74 +123,53 @@ def ik_position_dls(p_des, q0, qlim=None, max_iter=500, tol=1e-6,
 if __name__ == "__main__":
     from fk_mdh import myarm
 
-    q_init = np.array([np.radians(0.0),
-                np.radians(-30.7),
-                np.radians(-42.2),
-                np.radians(37.1),
-                0.0], dtype=float)
-    
+    # q_init = np.array([np.radians(20.0), np.radians(-30.7), np.radians(-42.2), np.radians(37.1), 0.0], dtype=float) # 测试 1
+    q_init = np.array([np.radians(10.0), np.radians(-46.0), np.radians(-84.4), np.radians(40.9), 0.02], dtype=float) # 测试 2
+    # print("初始关节量(rad):", q_init)
+    # [ 0.         -0.53581608 -0.73652894  0.64751715  0.        ]
+    # myarm.teach(q_init)
+
     q_init_deg = np.degrees(q_init)
-    T_home = myarm.fkine(q_init)
-    T_home_mat = T_home.A
-    T_pose = (T_home_mat[0:3, 3][0], T_home_mat[0:3, 3][1], T_home_mat[0:3, 3][2])
-    T_home_euler_deg = T_home.rpy(order='zyx', unit='deg')  # 提取欧拉角部分，ZYX 顺序
-    T_home_euler_rad = T_home.rpy(order='zyx', unit='rad')
+
+    T_init = myarm.fkine(q_init)
+    T_init_mat = T_init.A
+    T_pose = (T_init_mat[0:3, 3][0], T_init_mat[0:3, 3][1], T_init_mat[0:3, 3][2])
+    T_init_euler_deg = T_init.rpy(order='zyx', unit='deg')  # 提取欧拉角部分，ZYX 顺序
+    T_init_euler_rad = T_init.rpy(order='zyx', unit='rad')
     x, y, z = T_pose
-    roll, pitch, yaw = T_home_euler_rad
-    pos_home = np.array([x, y, z, roll, pitch, yaw])
+    roll, pitch, yaw = T_init_euler_rad
+    p_init = np.array([x, y, z, roll, pitch, yaw])
     # print("RTB_MDH计算结果: ")
     # print(f"关节空间坐标(rad): {np.round(q_init, 4)}")
     # print(f"关节空间坐标(deg): {np.round(q_init_deg, 4)}")
-    # print(f"工作空间坐标: {np.round(pos_home, 4)}")
+    # print(f"工作空间坐标: {np.round(p_init, 4)}")
 
-    # 用 RTB 算
-    p_rtb = T_home_mat
+    # # 用 RTB 算
+    # p_rtb = T_init_mat
 
-    # 用你手写 FK 算
-    T = fk_all(q_init)[-1]
-    p_mine = T
+    # # 用手写 FK 算
+    # T = fk_all(q_init)[-1]
+    # p_mine = T
 
-    print("rtb:", p_rtb)
-    print("mine:", p_mine)
-    print("diff:", p_mine - p_rtb)
-    """结果：
-    rtb: [[ 8.11063819e-01  3.58183272e-17  5.84957675e-01  2.32426014e-01]
-    [-3.58183272e-17  1.00000000e+00 -1.15690045e-17 -4.03900000e-02]
-    [-5.84957675e-01 -1.15690045e-17  8.11063819e-01  2.94085010e-01]
-    [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.00000000e+00]]
-    mine: [[ 8.11063819e-01  3.58183272e-17  5.84957675e-01  2.32426014e-01]
-    [-3.58183272e-17  1.00000000e+00 -1.15690045e-17 -4.03900000e-02]
-    [-5.84957675e-01 -1.15690045e-17  8.11063819e-01  2.94085010e-01]
-    [ 0.00000000e+00  0.00000000e+00  0.00000000e+00  1.00000000e+00]]
-    diff: [[0. 0. 0. 0.]
-    [0. 0. 0. 0.]
-    [0. 0. 0. 0.]
-    [0. 0. 0. 0.]]
-    """
+    # print("rtb:", p_rtb)
+    # print("mine:", p_mine)
+    # print("diff:", p_mine - p_rtb)
 
     # 目标位置
-    p_target = np.array([0.232, -0.04, 0.294], dtype=float)
-
-    qlim = [
-        (-np.pi, np.pi),
-        (-np.pi/2, np.pi/2),
-        (-np.pi/2, np.pi/2),
-        (-np.pi, np.pi),
-        (0.0, 0.04),
-    ]
-
-    q_sol, ok, iters, err = ik_position_dls(
-        p_target, q_init, qlim=qlim, max_iter=2000, tol=1e-6,
+    p_target = p_init[0:3]
+    print("目标位置:", p_target)
+    
+    q_iter_start = np.array([np.radians(10.0), np.radians(0.0), np.radians(0.0), np.radians(0.0), 0.02], dtype=float)
+    qlim = [ (-np.pi, np.pi), (-np.pi/2, np.pi/2), (-np.pi/2, np.pi/2), (-np.pi, np.pi), (0.0, 0.04),]
+    q_sol, status, iters, err = ik_position_dls(
+        p_target, q_iter_start, qlim=qlim, max_iter=2000, tol=1e-4, # 误差容许值：0.1mm
         lam=1e-3, k=0.5, step_clip=0.1
     )
 
-    print("ok:", ok, "iters:", iters, "final_err:", err)
-    print("q_sol_rad:", q_sol)
-    print("q_sol_deg:", np.degrees(q_sol[:4]), q_sol[4])
-    print("p_check:", fk_pos_mdh(q_sol))
-    """结果：
-    ok: True iters: 122 final_err: 7.652131726876494e-07
-    q_sol_rad: [ 0.00168293 -1.57079633  1.10077522  0.02611729  0.02976859]
-    q_sol_deg: [  0.09642486 -90.          63.0697743    1.49641073] 0.02976858952815505
-    p_check: [ 0.2320006  -0.03999962  0.29399971]
-    """
+    print("迭代结果:", status, "迭代轮次:", iters, "末端位置误差:", err)
+    print("迭代结果位置:", fk_pos_mdh(q_sol), "\n迭代结果关节量:", q_sol)
+    # print("q_sol_deg:", np.degrees(q_sol[:4]), q_sol[4])
+    print("迭代前位姿可视化")
+    myarm.teach(q_iter_start)
+    print("迭代后位姿可视化")
+    myarm.teach(q_sol)
