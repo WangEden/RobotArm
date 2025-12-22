@@ -48,7 +48,8 @@ if __name__ == "__main__":
     # print(f"工作空间坐标: {np.round(pos_test, 4)}")
 
     # 调用 teach，可以启动带滑块的示教器
+    q_init = np.array([0, 0, 0, 0, 0])
     # q_init = np.array([np.radians(0.0), np.radians(0.0), np.radians(0.0), np.radians(0.0), 0.02], dtype=float)
     # q_init = np.array([np.radians(10.0), np.radians(-46.0), np.radians(-84.4), np.radians(40.9), 0.02], dtype=float)
-    q_init = np.array([np.radians(46.0), np.radians(-30.7), np.radians(-33.2), np.radians(-76.7), 0.02], dtype=float)
+    # q_init = np.array([np.radians(46.0), np.radians(-30.7), np.radians(-33.2), np.radians(-76.7), 0.02], dtype=float)
     myarm.teach(q_init)
