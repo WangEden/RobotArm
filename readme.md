@@ -13,8 +13,9 @@ pip install pin #(仅Linux可用)
 ```
 
 文件说明
-正运动学：fk_mdh.py
-逆运动学-几何解析法：ik_analytical_posture.py
-逆运动学-混合雅可比迭代法：ik_hybrid_posture_all.py
-轨迹规划：path_trajectory_sim.py
-运动控制：move_control_sim.py
+- 正运动学：fk_mdh.py
+- 逆运动学-几何解析法：ik_analytical_posture.py
+- 逆运动学-混合雅可比迭代法：
+ik_hybrid_posture_all.py
+- 轨迹规划：path_trajectory_sim.py
+- 运动控制：move_control_sim.py
