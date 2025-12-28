@@ -14,7 +14,7 @@ L5 = PrismaticMDH(theta=0.0,  a=0.0,        alpha=-np.pi/2,   offset=0.07403, ql
 myarm = DHRobot([L1, L2, L3, L4, L5], name="My5DOF")
 
 # ==========================================
-# 2. 解析逆运动学函数
+# 2. 解析法逆运动学函数
 # ==========================================
 def my_ik_analytical(T_target: np.ndarray, q5_val=0.0, solution_mask=[1, -1]):
     

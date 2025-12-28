@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 class RobotArmRRRRP:
     def __init__(self):
-        # --- 1. 物理参数定义 ---
+        # 1. 物理参数定义
         self.g0 = 9.81  # 重力加速度
         
         # 连杆长度 (m)
@@ -18,12 +18,12 @@ class RobotArmRRRRP:
         self.m2 = 0.439
         # m3 = Link3 + Motor4
         self.m3 = 0.439
-        # m4 = Link4 + Motor5 (注意这里是修正后的大质量)
+        # m4 = Link4 + Motor5
         self.m4 = 0.29957 
         # m5 = Link5 (末端)
         self.m5 = 0.00003
         
-        # 组合质量 (用于简化公式)
+        # 组合质量
         self.M3_plus = self.m3 + self.m4 + self.m5
         self.M4_plus = self.m4 + self.m5
         
@@ -43,7 +43,7 @@ class RobotArmRRRRP:
         # 等效转子惯量 (k_r^2 * I_rotor)
         self.Im_eff = 0.00202 
         
-        # 摩擦系数 (用于仿真真实环境)
+        # 摩擦系数 (用于仿真模拟真实环境，实际数值需要实验测定)
         self.Fv = np.array([0.05, 0.05, 0.05, 0.01, 0.001]) # 粘滞摩擦
         self.Fs = np.array([0.02, 0.02, 0.02, 0.01, 0.001]) # 库仑摩擦
 
@@ -68,11 +68,11 @@ class RobotArmRRRRP:
         s23 = np.sin(q2 + q3)
         c23 = np.cos(q2 + q3)
         
-        # 注意：这里使用 q2=0 竖直向上的定义，因此与重力有关的角度是 s234
+        # 定义 q2 = 0 为竖直向上零位，因此与重力有关的角度是 s234
         # 但 B 矩阵中的几何投影关系通常定义 0 为伸直。
         # 为保持一致性，B 矩阵推导通常基于几何构型。
-        # 下面的 B 矩阵公式基于标准 DH 习惯 (q2=0 伸直)，与 g 向量的定义需要匹配。
-        # 这里假设 q2, q3, q4 均为相对上一级伸直为 0。
+        # 下面的 B 矩阵公式基于标准 DH 习惯 (q2 = 0 伸直)，与 g 向量的定义需要匹配。
+        # 这里假设 q2, q3, q4 均为相对上一级伸直为 0
         
         c234 = np.cos(q2 + q3 + q4)
         s234 = np.sin(q2 + q3 + q4)
@@ -85,9 +85,7 @@ class RobotArmRRRRP:
         
         # B11: 绕基座 Z 轴转动惯量 (随臂伸展变化)
         # r_proj 是各质心到转轴的水平距离。
-        # 假设 q2=0 是竖直向上，则水平距离用 sin 计算。
-        # 如果 q2=0 是水平伸展，则水平距离用 cos 计算。
-        # 根据之前的修正：q=0 为竖直向上。
+        # q2=0 为竖直向上，因此水平距离用 sin 计算。
         # 因此水平投影半径 R = L * sin(theta)
         r_proj_2 = self.a2 * s2
         r_proj_3 = self.a2 * s2 + self.a3 * s23
@@ -121,8 +119,7 @@ class RobotArmRRRRP:
                   self.m4 * (self.a3**2 + self.a2 * self.a3 * c3)
         B[1, 2] = B[2, 1] = b23_val
         
-        # B24 (肩-腕) - 修正后的非零项
-        # 包含 Link 4 质心偏置的影响
+        # B24 (肩-腕)
         b24_val = self.m4 * (self.rc4**2 + self.a3 * self.rc4 * c4 + self.a2 * self.rc4 * np.cos(q3 + q4))
         B[1, 3] = B[3, 1] = b24_val + self.Im_eff * 0.1 # 假设部分耦合
         
@@ -152,9 +149,8 @@ class RobotArmRRRRP:
         C_vec[3] = (h24 + h34) * dq2**2 + h34 * dq3**2 + 2 * h34 * dq2 * dq3
         
         # C1 (Base) - 简化，主要受 B11 变化影响
-        # C1 approx (dB11/dt * dq1 / 2) ? 
-        # C1 = (dB11/dq2 * dq2 + ...) * dq1
-        # 这里做简化处理，设为0或简单的阻尼项
+        # C1 approx (dB11/dt * dq1 / 2)
+        # 这里做简化处理，设为0
         
         # --- 3. 重力向量 g (5x1) ---
         # q=0 竖直向上定义：关节力矩与 sin(theta) 成正比
@@ -191,17 +187,17 @@ class RobotArmRRRRP:
         ddq = np.linalg.solve(B + np.eye(5)*1e-6, tau_net)
         return ddq
 
-# --- 仿真控制器 ---
 
+# 仿真控制器
 def computed_torque_control(robot, q, dq, q_des, dq_des, ddq_des):
     """
     计算力矩控制 (CTC)
     """
-    # PID 增益
-    # Kp: 比例增益 (刚度)，决定了消除位置误差的“力度”
+    # 单个关节电机的 PID 增益
+    # Kp: 比例增益
     # Kp = np.array([100, 150, 150, 80, 100]) # test1
     Kp = np.array([50, 75, 75, 40, 50]) # test2
-    # Kv: 微分增益 (阻尼)，决定了消除速度误差的“阻力”，防止震荡
+    # Kv: 微分增益
     # Kv = np.array([20,  30,  30,  10, 20]) # test1
     Kv = np.array([14, 17, 17, 12, 14]) # test2
     
@@ -225,7 +221,6 @@ def computed_torque_control(robot, q, dq, q_des, dq_des, ddq_des):
     
     return tau
 
-# --- 主程序 ---
 
 if __name__ == "__main__":
     # 初始化机器人
@@ -241,7 +236,7 @@ if __name__ == "__main__":
     q = np.zeros(5)
     dq = np.zeros(5)
     
-    # 期望轨迹 (正弦波运动测试)
+    # 期望轨迹 (正弦波跟踪测试)
     # 让 Joint 2, 3, 4 做点头运动，Joint 5 做伸缩
     q_des_traj = np.zeros((steps, 5))
     dq_des_traj = np.zeros((steps, 5))
@@ -284,35 +279,47 @@ if __name__ == "__main__":
         tau_hist.append(tau.copy())
         
         if i % 100 == 0:
-            print(f"Time: {time[i]:.2f}s | Error J2: {q_des_traj[i,1]-q[1]:.4f}")
+            print(f"Time: {time[i]:.2f}s | J2 误差: {q_des_traj[i,1]-q[1]:.4f}，J3 误差: {q_des_traj[i,2]-q[2]:.4f}，J4 误差: {q_des_traj[i,3]-q[3]:.4f}")
 
     # --- 绘图结果 ---
     q_hist = np.array(q_hist)
     tau_hist = np.array(tau_hist)
     
-    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+    fig, axs = plt.subplots(2, 2, figsize=(10, 6))
     
     # 1. 位置跟踪图
-    axs[0].plot(time, q_des_traj[:, 1], 'k--', label='Target J2')
-    axs[0].plot(time, q_hist[:, 1], 'r', label='Actual J2')
-    axs[0].plot(time, q_hist[:, 2], 'g', label='Actual J3')
-    axs[0].plot(time, q_hist[:, 3], 'b', label='Actual J4')
-    axs[0].set_title('Joint Position Tracking (CTC Control)')
-    axs[0].set_xlabel('Time (s)')
-    axs[0].set_ylabel('Angle (rad)')
-    axs[0].legend()
-    axs[0].grid(True)
+    axs[0,0].plot(time, q_des_traj[:, 1], 'k--', label='Target J2')
+    axs[0,1].plot(time, q_des_traj[:, 2], 'k--.', label='Target J3')
+    axs[1,0].plot(time, q_des_traj[:, 3], 'k--', label='Target J4')
+    axs[0,0].plot(time, q_hist[:, 1], 'r', label='Actual J2')
+    axs[0,1].plot(time, q_hist[:, 2], 'g', label='Actual J3')
+    axs[1,0].plot(time, q_hist[:, 3], 'b', label='Actual J4')
+    axs[0,0].set_title('Joint Position Tracking (CTC Control)')
+    axs[0,1].set_title('Joint Position Tracking (CTC Control)')
+    axs[1,0].set_title('Joint Position Tracking (CTC Control)')
+    axs[0,0].set_xlabel('Time (s)')
+    axs[0,1].set_xlabel('Time (s)')
+    axs[1,0].set_xlabel('Time (s)')
+    axs[0,0].set_ylabel('Angle (rad)')
+    axs[1,0].set_ylabel('Angle (rad)')
+    axs[1,1].set_ylabel('Angle (rad)')
+    axs[0,0].legend()
+    axs[0,1].legend()
+    axs[1,0].legend()
+    axs[0,0].grid(True)
+    axs[0,1].grid(True)
+    axs[1,0].grid(True)
     
     # 2. 力矩输出图
-    axs[1].plot(time, tau_hist[:, 1], label='Tau J2')
-    axs[1].plot(time, tau_hist[:, 2], label='Tau J3')
-    axs[1].plot(time, tau_hist[:, 3], label='Tau J4')
-    axs[1].plot(time, tau_hist[:, 4], label='Tau J5')
-    axs[1].set_title('Control Torques')
-    axs[1].set_xlabel('Time (s)')
-    axs[1].set_ylabel('Torque (Nm)')
-    axs[1].legend()
-    axs[1].grid(True)
+    axs[1,1].plot(time, tau_hist[:, 1], label='Tau J2')
+    axs[1,1].plot(time, tau_hist[:, 2], label='Tau J3')
+    axs[1,1].plot(time, tau_hist[:, 3], label='Tau J4')
+    axs[1,1].plot(time, tau_hist[:, 4], label='Tau J5')
+    axs[1,1].set_title('Control Torques')
+    axs[1,1].set_xlabel('Time (s)')
+    axs[1,1].set_ylabel('Torque (Nm)')
+    axs[1,1].legend()
+    axs[1,1].grid(True)
     
     plt.tight_layout()
     plt.show()

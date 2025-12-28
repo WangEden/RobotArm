@@ -1,7 +1,11 @@
+"""
+混合运动学逆解，利用几何特性简化雅可比迭代，
+由于机械臂是 5-DOF，无法完全任意定位和定姿，因此标准的雅可比迭代法无法直接应用，
+需要利用几何特性进行降维，只在部分自由度上进行迭代
+"""
 import numpy as np
 from scipy.optimize import least_squares
 
-# ===== 你的基础函数 (保持不变) =====
 d1 = 0.08525
 a2 = 0.12893
 a3 = 0.129
@@ -36,16 +40,15 @@ def fk_all(q):
 def fk_pos_mdh(q):
     return fk_all(q)[-1][:3,3]
 
-# ===== 核心：利用几何特性的解法 =====
+# 利用几何特性的混合迭代逆解函数
 
 def ik_smart_hybrid(p_des, rpy_des, qlim=None):
     """
-    利用 5-DOF 几何约束的混合求解器。
-    
+    利用 5-DOF 几何约束的混合雅可比迭代求解器
     思路：
-    1. q1 由目标 (x,y) 直接决定。
-    2. q4 不是独立变量，它由目标 Pitch 和 q2, q3 决定 (q2+q3+q4 = const)。
-    3. 问题降维为寻找最佳的 [q2, q3, q5] 来匹配位置 (x,y,z)。
+    1. q1 由 rpy 姿态中的 Yaw 直接决定
+    2. q4 不是独立变量，由目标 Pitch 和 q2, q3 决定 (q2+q3+q4 = const)
+    3. 于是问题降维为寻找最佳的 [q2, q3, q5] 来匹配位置 (x,y,z)
     """
     p_des = np.array(p_des)
     r_des, p_des_ang, y_des = rpy_des
@@ -59,16 +62,7 @@ def ik_smart_hybrid(p_des, rpy_des, qlim=None):
         # is_head_up = False
         
     # --- 步骤 2: 解析计算 q1 (Base Yaw) ---
-    # # 机械臂必须旋转到底座面向目标的位置
-    # # 注意：如果目标在原点正上方，atan2会不稳定，此时保持原值或设为0
-    # if np.linalg.norm(p_des[:2]) < 1e-4:
-    #     q1_fixed = 0.0 
-    # else:
-    #     q1_fixed = np.arctan2(p_des[1], p_des[0])
-        
-    # # 如果是"头朝下"且需要反向操作(背对目标)，逻辑会更复杂
-    # # 但根据您的描述，y_des 在头朝下时是 -180+base，说明物理上 base 还是指向目标的
-    # # 这里我们假设 q1 总是让平面正对目标 (或目标在平面内)
+    # 机械臂必须旋转到底座面向目标的位置，即 q1 总是让平面正对目标 (或目标在平面内)
     # rpy中的y，在头朝上时，其值和底部基座旋转角度完全一致，头朝下时，为-180°加上底部基座旋转角度
     if is_head_up:
         q1_fixed = wrap_to_pi(y_des)
@@ -76,7 +70,6 @@ def ik_smart_hybrid(p_des, rpy_des, qlim=None):
         q1_fixed = wrap_to_pi(y_des - np.pi)
 
     # --- 步骤 3: 确定平面关节和 (Phi) ---
-    # 您的规律：
     # 头朝上: sum(q2,q3,q4) = -Pitch
     # 头朝下: sum(q2,q3,q4) = Pitch + pi
     if is_head_up:
@@ -104,11 +97,11 @@ def ik_smart_hybrid(p_des, rpy_des, qlim=None):
         # 误差仅为位置误差 (姿态通过上面的约束天然满足)
         return pos_curr - p_des
 
-    # 初始猜测 (Initial Guess)
+    # 初始猜测
     # q2, q3 给个常用弯曲角度，q5 给中值
     x0 = [0.0, -np.pi/2, 0.02] 
     
-    # 提取边界 (Bounds)
+    # 提取边界
     # qlim 格式: [(min,max), ...]
     if qlim is None:
         bounds = (-np.inf, np.inf)
@@ -130,7 +123,7 @@ def ik_smart_hybrid(p_des, rpy_des, qlim=None):
     q4_sol = wrap_to_pi(q4_sol)
     # 如果 q4 超限，说明该姿态不可达
     if qlim and (q4_sol < qlim[3][0] or q4_sol > qlim[3][1]):
-         print(f"警告: 计算出的 q4 ({np.degrees(q4_sol):.2f}) 超出限位!")
+         print(f"[Warning] 计算出的 q4 ({np.degrees(q4_sol):.2f}) 超出限位!")
     
     q_final = np.array([q1_fixed, q2_sol, q3_sol, q4_sol, q5_sol])
     
@@ -139,9 +132,9 @@ def ik_smart_hybrid(p_des, rpy_des, qlim=None):
 
 # ================= 测试代码 =================
 if __name__ == "__main__":
-    from fk_mdh import myarm # 假设这部分你已经有了
+    from fk_mdh import myarm
     
-    # 1. 设定一个测试目标
+    # 设定测试目标位姿
     # q_init = np.array([np.radians(20.0), np.radians(-30.7), np.radians(-42.2), np.radians(37.1), 0.0], dtype=float) # 测试 1 ✅
     q_init = np.array([np.radians(46.0), np.radians(-30.7), np.radians(-33.2), np.radians(-76.7), 0.02], dtype=float) # 测试 2 ✅
     # q_init = np.array([np.radians(46.0), np.radians(20.5), np.radians(-28.1), np.radians(-56.2), 0.0], dtype=float) # 测试 3 ✅
@@ -167,7 +160,7 @@ if __name__ == "__main__":
     # 关节限位
     qlim = [ (-np.pi, np.pi), (-np.pi/2, np.pi/2), (-np.pi/2, np.pi/2), (-np.pi, np.pi), (0.0, 0.04)]
 
-    print("=== 开始 Smart Hybrid IK 计算 ===")
+    print("=== 开始 Hybrid IK 计算 ===")
     print(f"目标位置: {p_target}")
     print(f"目标 RPY: {rpy_target}")
 
@@ -186,7 +179,6 @@ if __name__ == "__main__":
     pos_final = T_final[:3, 3]
     
     # 计算实际 RPY
-    # (简易转换，严格来说应该用你的 myarm.fkine().rpy())
     import math
     sy = math.sqrt(T_final[0,0]**2 + T_final[1,0]**2)
     r_act = math.atan2(T_final[2,1], T_final[2,2])
@@ -197,7 +189,7 @@ if __name__ == "__main__":
     print(f"位置误差: {np.linalg.norm(p_target - pos_final) * 1000:.4f} mm")
     print(f"实际 RPY: {np.array([r_act, p_act, y_act])}")
     
-    # 验证你的约束规律
+    # 验证约束规律
     q2, q3, q4 = q_sol[1], q_sol[2], q_sol[3]
     q_sum = q2+q3+q4
     print(f"验证 Pitch 约束: q2+q3+q4 = {np.degrees(q_sum):.2f}°, -Pitch目标 = {np.degrees(-rpy_target[1]):.2f}°")

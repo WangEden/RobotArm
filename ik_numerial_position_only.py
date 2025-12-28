@@ -1,6 +1,6 @@
 import numpy as np
 
-# ===== 常量（你的参数） =====
+# ===== 常量 =====
 d1 = 0.08525
 a2 = 0.12893
 a3 = 0.129
@@ -113,7 +113,7 @@ def ik_position_dls(p_des, q0, qlim=None, max_iter=500, tol=1e-6,
         # 限位
         if qlim is not None:
             for i in range(4):
-                q[i] = (q[i] + np.pi) % (2*np.pi) - np.pi   # wrap 到 [-pi,pi] 更合理
+                q[i] = (q[i] + np.pi) % (2*np.pi) - np.pi   # wrap 到 [-pi,pi]
                 q[i] = np.clip(q[i], qlim[i][0], qlim[i][1])
             q[4] = np.clip(q[4], qlim[4][0], qlim[4][1])
 
