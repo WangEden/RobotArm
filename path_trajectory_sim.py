@@ -5,7 +5,6 @@ import roboticstoolbox as rtb
 
 # 引入你提供的模块
 from fk_mdh import myarm
-# from ik_analytical_posture import my_ik_analytical
 from ik_hybrid_posture_all import ik_smart_hybrid
 
 # ==========================================
